@@ -2,8 +2,13 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+const String googleApiKey = "AIzaSyBji2i7e6EcdUgibJPeL7JqlBUZF-ERBW0";
 
 void main() => runApp(const MyApp());
 
@@ -28,6 +33,7 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
 
   static const _ritzCarltonSFO = LatLng(37.788302, -122.403209);
 
@@ -59,6 +65,9 @@ class _MapScreenState extends State<MapScreen> {
 
       // Adjust map to show both the Ritz and the user's location
       _updateCameraBounds(currentLatLng);
+
+      // Get and draw the route
+      await _getRoute(currentLatLng, _ritzCarltonSFO);
 
     } catch (e) {
       print(e);
@@ -122,6 +131,7 @@ class _MapScreenState extends State<MapScreen> {
         myLocationEnabled: true, // Enable the blue dot for current location
         myLocationButtonEnabled: false, // We use our own button
         markers: _markers,
+        polylines: _polylines,
         onMapCreated: (controller) {
           _controller.complete(controller);
         },
@@ -158,5 +168,34 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     return await Geolocator.getCurrentPosition();
+  }
+
+  Future<void> _getRoute(LatLng start, LatLng end) async {
+    final url = 'https://maps.googleapis.com/maps/api/directions/json?origin=${start.latitude},${start.longitude}&destination=${end.latitude},${end.longitude}&key=$googleApiKey';
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['routes'].isNotEmpty) {
+        final polylinePoints = PolylinePoints();
+        final result = polylinePoints.decodePolyline(data['routes'][0]['overview_polyline']['points']);
+        final polylineCoordinates = result.map((point) => LatLng(point.latitude, point.longitude)).toList();
+
+        setState(() {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('route'),
+              color: Colors.blue,
+              width: 5,
+              points: polylineCoordinates,
+            ),
+          );
+        });
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('経路の取得に失敗しました。')),
+      );
+    }
   }
 }
