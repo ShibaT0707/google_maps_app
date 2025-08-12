@@ -8,9 +8,19 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:google_maps_flutter_ios/google_maps_flutter_ios.dart';
+import 'package:flutter/foundation.dart';
+
 const String googleApiKey = "AIzaSyBji2i7e6EcdUgibJPeL7JqlBUZF-ERBW0";
 
-void main() => runApp(const MyApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Set the Google Maps API key for iOS
+  if (defaultTargetPlatform == TargetPlatform.iOS) {
+    GoogleMapsFlutterIOS.registerWith(apiKey: googleApiKey);
+  }
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -58,23 +68,23 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
 
-    try {
-      // Get current location to adjust camera
-      final location = await _determinePosition();
-      final currentLatLng = LatLng(location.latitude, location.longitude);
+    // try {
+    //   // Get current location to adjust camera
+    //   final location = await _determinePosition();
+    //   final currentLatLng = LatLng(location.latitude, location.longitude);
 
-      // Adjust map to show both the Ritz and the user's location
-      _updateCameraBounds(currentLatLng);
+    //   // Adjust map to show both the Ritz and the user's location
+    //   _updateCameraBounds(currentLatLng);
 
-      // Get and draw the route
-      await _getRoute(currentLatLng, _ritzCarltonSFO);
+    //   // Get and draw the route
+    //   await _getRoute(currentLatLng, _ritzCarltonSFO);
 
-    } catch (e) {
-      print(e);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('現在地の取得に失敗しました。リッツ・カールトンのみ表示します。')),
-      );
-    }
+    // } catch (e) {
+    //   print(e);
+    //   ScaffoldMessenger.of(context).showSnackBar(
+    //     const SnackBar(content: Text('現在地の取得に失敗しました。リッツ・カールトンのみ表示します。')),
+    //   );
+    // }
 
     // Re-render the screen to show the Ritz marker
     setState(() {});
@@ -137,7 +147,7 @@ class _MapScreenState extends State<MapScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: _goToCurrentLocation,
+        onPressed: null,
         child: const Icon(Icons.my_location),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
