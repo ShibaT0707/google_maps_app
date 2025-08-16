@@ -30,11 +30,8 @@ class _MapScreenState extends State<MapScreen> {
   bool _isNavigating = false;
   List<NavigationWaypoint> _destinations = [];
   bool _isRouteLoaded = false;
-  bool _cameraCentered = false;
 
   PermissionStatus _locationPermissionStatus = PermissionStatus.denied;
-  StreamSubscription<RoadSnappedLocationUpdatedEvent>? _locationSubscription;
-  LatLng? _currentUserPosition;
 
   static const _ritzCarltonSFO =
       LatLng(latitude: 37.788302, longitude: -122.403209);
@@ -58,7 +55,6 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   void dispose() {
-    _locationSubscription?.cancel();
     if (_isNavigationSessionInitialized) {
       GoogleMapsNavigator.cleanup();
     }
@@ -92,52 +88,42 @@ class _MapScreenState extends State<MapScreen> {
     ]);
   }
 
-  Future<void> _startListeningToLocation(GoogleMapViewController controller) async {
-    await _locationSubscription?.cancel();
-    _locationSubscription =
-        await GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
-      if (mounted) {
-        setState(() {
-          _currentUserPosition = event.location;
-        });
-
-        if (!_cameraCentered && _currentUserPosition != null) {
-          controller.animateCamera(
-            CameraUpdate.newLatLngZoom(_currentUserPosition!, 14),
-          );
-          setState(() {
-            _cameraCentered = true;
-          });
-        }
-      }
-    });
+  Future<void> _centerOnUserLocation(GoogleMapViewController controller) async {
+    final location = await controller.getMyLocation();
+    if (location != null) {
+      controller.animateCamera(
+        CameraUpdate.newLatLngZoom(location, 14),
+      );
+    }
   }
 
   void _onMapViewCreated(GoogleMapViewController controller) {
     setState(() {
       _mapController = controller;
-      _cameraCentered = false;
     });
     controller.setMyLocationEnabled(true);
     _addDestinationMarker(controller);
-    _startListeningToLocation(controller);
+    _centerOnUserLocation(controller);
   }
 
   void _onNavigationViewCreated(GoogleNavigationViewController controller) {
     setState(() {
       _mapController = controller;
-      _cameraCentered = false;
     });
     controller.setMyLocationEnabled(true);
     _addDestinationMarker(controller);
-    _startListeningToLocation(controller);
+    _centerOnUserLocation(controller);
   }
 
-  void _calculateAndShowRoute() {
-    if (_currentUserPosition == null) {
+  void _calculateAndShowRoute() async {
+    if (_mapController == null) return;
+
+    final position = await _mapController!.getMyLocation();
+
+    if (position == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('現在地が取得できていません。少し待ってから再度お試しください。')),
+            content: Text('現在地が取得できていません。GPSを確認して再度お試しください。')),
       );
       return;
     }
@@ -166,6 +152,12 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildBody() {
+    // We are not using a state variable for the user's position anymore, so we can define a default initial camera position.
+    // The _centerOnUserLocation method will animate to the user's location once the view is created.
+    const initialCameraPosition = CameraPosition(
+        target: LatLng(latitude: 37.7749, longitude: -122.4194),
+        zoom: 14);
+
     if (_locationPermissionStatus != PermissionStatus.granted) {
       return const Center(child: Text('位置情報の許可が必要です。'));
     }
@@ -177,20 +169,14 @@ class _MapScreenState extends State<MapScreen> {
         ? GoogleMapsNavigationView(
             key: const ValueKey('navigation_view'),
             onViewCreated: _onNavigationViewCreated,
-            initialCameraPosition: CameraPosition(
-                target: _currentUserPosition ??
-                    const LatLng(latitude: 37.7749, longitude: -122.4194),
-                zoom: 14),
+            initialCameraPosition: initialCameraPosition,
             initialNavigationUIEnabledPreference:
                 NavigationUIEnabledPreference.automatic,
           )
         : GoogleMapsMapView(
             key: const ValueKey('map_view'),
             onViewCreated: _onMapViewCreated,
-            initialCameraPosition: CameraPosition(
-                target: _currentUserPosition ??
-                    const LatLng(latitude: 37.7749, longitude: -122.4194),
-                zoom: 14),
+            initialCameraPosition: initialCameraPosition,
           );
   }
 
@@ -208,7 +194,6 @@ class _MapScreenState extends State<MapScreen> {
                     _isNavigating = false;
                     _isRouteLoaded = false;
                     _destinations = [];
-                    _cameraCentered = false;
                     GoogleMapsNavigator.clearDestinations();
                   });
                 },
@@ -221,8 +206,7 @@ class _MapScreenState extends State<MapScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 FloatingActionButton(
-                  onPressed: _currentUserPosition == null ? null : _calculateAndShowRoute,
-                  backgroundColor: _currentUserPosition == null ? Colors.grey : Theme.of(context).colorScheme.secondary,
+                  onPressed: _calculateAndShowRoute,
                   child: const Icon(Icons.directions),
                 ),
                 const SizedBox(height: 16),
