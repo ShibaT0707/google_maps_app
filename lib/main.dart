@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_app/speech_service.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 void main() => runApp(const MyApp());
 
@@ -46,17 +47,20 @@ class _MapScreenState extends State<MapScreen> {
     _setInitialState();
     _speechService.initialize(
       onResult: _onSpeechResult,
-      onListeningStopped: () => setState(() => _isListening = false),
+      onStatusChanged: _onStatusChanged,
     );
-    setState(() {
-      _isListening = true;
-    });
   }
 
   @override
   void dispose() {
     _speechService.stopListening();
     super.dispose();
+  }
+
+  void _onStatusChanged(String status) {
+    setState(() {
+      _isListening = status == SpeechToText.listeningStatus;
+    });
   }
 
   void _onSpeechResult(String text) {
@@ -142,7 +146,6 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,33 +153,33 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('Google Maps App'),
         backgroundColor: Colors.green[700],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: GoogleMap(
-              initialCameraPosition: _initialCameraPosition,
-              myLocationEnabled: true, // Enable the blue dot for current location
-              myLocationButtonEnabled: false, // We use our own button
-              markers: _markers,
-              onMapCreated: (controller) {
-                _controller.complete(controller);
-              },
-            ),
+      body: Stack(
+        children: <Widget>[
+          GoogleMap(
+            initialCameraPosition: _initialCameraPosition,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            markers: _markers,
+            onMapCreated: (controller) {
+              _controller.complete(controller);
+            },
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _isListening ? Icons.mic : Icons.mic_off,
-                  color: _isListening ? Colors.green : Colors.red,
+          if (_isListening)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.black54,
+                child: Text(
+                  _lastRecognizedText,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24.0,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(width: 8),
-                Expanded(child: Text(_lastRecognizedText, style: const TextStyle(fontSize: 16))),
-              ],
+              ),
             ),
-          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(

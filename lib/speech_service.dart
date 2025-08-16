@@ -8,17 +8,16 @@ class SpeechService {
   // Callback to notify the UI about recognized words
   void Function(String)? onResult;
 
-  // Callback to notify the UI when listening has stopped
-  void Function()? onListeningStopped;
+  // Callback to notify the UI about status changes
+  void Function(String)? onStatusChanged;
 
   Future<void> initialize({
     required void Function(String) onResult,
-    required void Function() onListeningStopped,
+    required void Function(String) onStatusChanged,
   }) async {
     this.onResult = onResult;
-    this.onListeningStopped = onListeningStopped;
+    this.onStatusChanged = onStatusChanged;
 
-    // The status listener is passed to initialize, not listen.
     _speechEnabled = await _speechToText.initialize(
       onStatus: _onStatus,
       onError: (error) => print('Speech recognition error: $error'),
@@ -38,18 +37,18 @@ class SpeechService {
       onResult: _onSpeechResult,
       listenFor: const Duration(days: 1),
       pauseFor: const Duration(seconds: 5),
-      partialResults: true, // Keep getting results
+      partialResults: true,
+      localeId: 'ja_JP', // Set locale to Japanese
     );
   }
 
   void _onStatus(String status) {
-    print('Speech recognition status: $status');
-    // When the status is 'done' or 'notListening', it means the listening
-    // session has ended for some reason (e.g., silence). Restart it.
+    if (onStatusChanged != null) {
+      onStatusChanged!(status);
+    }
+
+    // When the status is 'done' or 'notListening', restart the listening session.
     if (status == SpeechToText.doneStatus || status == SpeechToText.notListeningStatus) {
-      if (onListeningStopped != null) {
-        onListeningStopped!();
-      }
       // Add a small delay before restarting to avoid rapid looping on some devices
       Future.delayed(const Duration(milliseconds: 500), () {
         _startListening();
@@ -65,15 +64,9 @@ class SpeechService {
 
   void stopListening() {
     _speechToText.stop();
-    if (onListeningStopped != null) {
-      onListeningStopped!();
-    }
   }
 
   void cancelListening() {
     _speechToText.cancel();
-    if (onListeningStopped != null) {
-      onListeningStopped!();
-    }
   }
 }
