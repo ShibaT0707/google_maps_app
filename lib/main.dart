@@ -16,33 +16,6 @@ class MyApp extends StatelessWidget {
       home: MapScreen(),
     );
   }
-
-  void _simulateDrive() {
-    if (!_isNavigationSessionInitialized) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Navigation session not initialized.')),
-      );
-      return;
-    }
-    // This is a guess based on common simulator APIs.
-    // The exact API could not be verified due to documentation access issues.
-    GoogleMapsNavigator.simulator.simulateJourney(
-      waypoints: [
-        NavigationWaypoint(
-          title: 'Start',
-          target: const LatLng(latitude: 37.7749, longitude: -122.4194),
-        ),
-        NavigationWaypoint(
-          title: 'The Ritz-Carlton, San Francisco',
-          target: _ritzCarltonSFO,
-        ),
-      ],
-      speedMultiplier: 2,
-    );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Starting drive simulation...')),
-    );
-  }
 }
 
 class MapScreen extends StatefulWidget {
@@ -277,6 +250,33 @@ class _MapScreenState extends State<MapScreen> {
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+    );
+  }
+
+  void _simulateDrive() {
+    if (!_isNavigationSessionInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Navigation session not initialized.')),
+      );
+      return;
+    }
+    // This is a guess based on common simulator APIs.
+    // The exact API could not be verified due to documentation access issues.
+    GoogleMapsNavigator.simulator.simulateJourney(
+      waypoints: [
+        NavigationWaypoint(
+          title: 'Start',
+          target: const LatLng(latitude: 37.7749, longitude: -122.4194),
+        ),
+        NavigationWaypoint(
+          title: 'The Ritz-Carlton, San Francisco',
+          target: _ritzCarltonSFO,
+        ),
+      ],
+      speedMultiplier: 2,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Starting drive simulation...')),
     );
   }
 }
