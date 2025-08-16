@@ -130,7 +130,7 @@ class _MapScreenState extends State<MapScreen> {
       waypoints: [destination],
       displayOptions: NavigationDisplayOptions(showDestinationMarkers: true),
     )).then((result) {
-      if (result.status == RouteStatus.ok) {
+      if (result == NavigationRouteStatus.statusOk) {
         setState(() {
           _destinations = [destination];
           _isRouteLoaded = true;
@@ -140,7 +140,7 @@ class _MapScreenState extends State<MapScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('経路の取得に失敗しました: ${result.status}')),
+          SnackBar(content: Text('経路の取得に失敗しました: $result')),
         );
       }
     });
