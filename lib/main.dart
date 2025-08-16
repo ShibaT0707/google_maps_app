@@ -4,9 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'dart:convert';
 
 void main() => runApp(const MyApp());
 
@@ -184,33 +182,30 @@ class _MapScreenState extends State<MapScreen> {
     final LatLng origin = LatLng(position.latitude, position.longitude);
 
     // Get polyline points
-    final PolylinePoints polylinePoints = PolylinePoints();
-    final String url =
-        'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$_apiKey';
+    final PolylinePoints polylinePoints = PolylinePoints(apiKey: _apiKey);
+    final PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      request: PolylineRequest(
+        origin: PointLatLng(origin.latitude, origin.longitude),
+        destination: PointLatLng(destination.latitude, destination.longitude),
+        mode: TravelMode.driving,
+      ),
+    );
 
-    final response = await http.get(Uri.parse(url));
+    if (result.points.isNotEmpty) {
+      final List<LatLng> polylineCoordinates = [];
+      result.points.forEach((point) {
+        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      });
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['routes'].isNotEmpty) {
-        final points = polylinePoints.decodePolyline(data['routes'][0]['overview_polyline']['points']);
-        if (points.isNotEmpty) {
-          final List<LatLng> polylineCoordinates = [];
-          points.forEach((point) {
-            polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-          });
-
-          setState(() {
-            final Polyline polyline = Polyline(
-              polylineId: const PolylineId('route'),
-              color: Colors.blue,
-              points: polylineCoordinates,
-              width: 5,
-            );
-            _polylines.add(polyline);
-          });
-        }
-      }
+      setState(() {
+        final Polyline polyline = Polyline(
+          polylineId: const PolylineId('route'),
+          color: Colors.blue,
+          points: polylineCoordinates,
+          width: 5,
+        );
+        _polylines.add(polyline);
+      });
     }
   }
 }
