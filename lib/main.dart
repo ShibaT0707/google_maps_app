@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -13,6 +14,33 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       home: MapScreen(),
+    );
+  }
+
+  void _simulateDrive() {
+    if (!_isNavigationSessionInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Navigation session not initialized.')),
+      );
+      return;
+    }
+    // This is a guess based on common simulator APIs.
+    // The exact API could not be verified due to documentation access issues.
+    GoogleMapsNavigator.simulator.simulateJourney(
+      waypoints: [
+        NavigationWaypoint(
+          title: 'Start',
+          target: const LatLng(latitude: 37.7749, longitude: -122.4194),
+        ),
+        NavigationWaypoint(
+          title: 'The Ritz-Carlton, San Francisco',
+          target: _ritzCarltonSFO,
+        ),
+      ],
+      speedMultiplier: 2,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Starting drive simulation...')),
     );
   }
 }
@@ -219,6 +247,14 @@ class _MapScreenState extends State<MapScreen> {
           ? Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (kDebugMode)
+                  FloatingActionButton(
+                    onPressed: _simulateDrive,
+                    backgroundColor: Colors.amber,
+                    child: const Icon(Icons.drive_eta, color: Colors.black),
+                    tooltip: 'Simulate Drive',
+                  ),
+                if (kDebugMode) const SizedBox(height: 16),
                 FloatingActionButton(
                   onPressed: _currentUserPosition == null ? null : _calculateAndShowRoute,
                   backgroundColor: _currentUserPosition == null
