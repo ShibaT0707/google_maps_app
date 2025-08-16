@@ -7,24 +7,24 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:google_maps_app/main.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('MapScreen builds and displays map', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const MyApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Allow the widget to render.
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verify that the GoogleMap widget is present.
+    expect(find.byType(GoogleMap), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify that the floating action button for location is present.
+    expect(find.byIcon(Icons.my_location), findsOneWidget);
+
+    // Verify that the initial listening status icon is present.
+    expect(find.byIcon(Icons.mic), findsOneWidget);
   });
 }

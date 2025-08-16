@@ -49,5 +49,9 @@
 	<string>This app needs access to location when in the background.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声認識機能を利用して、音声でアプリを操作するために使用します。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ウェイクワードの検出と音声コマンドのためにマイクを使用します。</string>
 </dict>
 </plist>

@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_app/speech_service.dart';
 
 void main() => runApp(const MyApp());
 
@@ -28,6 +29,9 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
+  final SpeechService _speechService = SpeechService();
+  String _lastRecognizedText = '';
+  bool _isListening = false;
 
   static const _ritzCarltonSFO = LatLng(37.788302, -122.403209);
 
@@ -40,6 +44,35 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _setInitialState();
+    _speechService.initialize(
+      onResult: _onSpeechResult,
+      onListeningStopped: () => setState(() => _isListening = false),
+    );
+    setState(() {
+      _isListening = true;
+    });
+  }
+
+  @override
+  void dispose() {
+    _speechService.stopListening();
+    super.dispose();
+  }
+
+  void _onSpeechResult(String text) {
+    setState(() {
+      _lastRecognizedText = text;
+    });
+
+    final lowerCaseText = text.toLowerCase();
+    if (lowerCaseText.startsWith("ok jules") || lowerCaseText.startsWith("okay jules")) {
+      final command = lowerCaseText.replaceFirst(RegExp(r'ok(ay)? jules\s*'), '');
+      if (command.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('認識されたコマンド: $command')),
+        );
+      }
+    }
   }
 
   void _setInitialState() async {
@@ -117,14 +150,34 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('Google Maps App'),
         backgroundColor: Colors.green[700],
       ),
-      body: GoogleMap(
-        initialCameraPosition: _initialCameraPosition,
-        myLocationEnabled: true, // Enable the blue dot for current location
-        myLocationButtonEnabled: false, // We use our own button
-        markers: _markers,
-        onMapCreated: (controller) {
-          _controller.complete(controller);
-        },
+      body: Column(
+        children: [
+          Expanded(
+            child: GoogleMap(
+              initialCameraPosition: _initialCameraPosition,
+              myLocationEnabled: true, // Enable the blue dot for current location
+              myLocationButtonEnabled: false, // We use our own button
+              markers: _markers,
+              onMapCreated: (controller) {
+                _controller.complete(controller);
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _isListening ? Icons.mic : Icons.mic_off,
+                  color: _isListening ? Colors.green : Colors.red,
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_lastRecognizedText, style: const TextStyle(fontSize: 16))),
+              ],
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _goToCurrentLocation,

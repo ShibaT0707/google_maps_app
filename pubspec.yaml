@@ -39,6 +39,7 @@ dependencies:
   flutter_polyline_points: ^3.0.1
   http: ^1.4.0
   google_maps_flutter_platform_interface: ^2.12.1
+  speech_to_text: ^6.6.2
 
 
 dev_dependencies:
