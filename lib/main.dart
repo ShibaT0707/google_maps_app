@@ -42,11 +42,19 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
-    _requestLocationPermission().then((_) {
-      if (_locationPermissionStatus == PermissionStatus.granted) {
-        _initializeNavigationSession();
-      }
+    _init();
+  }
+
+  Future<void> _init() async {
+    final status = await Permission.location.request();
+    setState(() {
+      _locationPermissionStatus = status;
     });
+
+    if (status == PermissionStatus.granted) {
+      // Only initialize navigation if permission is granted.
+      await _initializeNavigationSession();
+    }
   }
 
   @override
@@ -56,13 +64,6 @@ class _MapScreenState extends State<MapScreen> {
       GoogleMapsNavigator.cleanup();
     }
     super.dispose();
-  }
-
-  Future<void> _requestLocationPermission() async {
-    final status = await Permission.location.request();
-    setState(() {
-      _locationPermissionStatus = status;
-    });
   }
 
   Future<void> _initializeNavigationSession() async {
