@@ -87,7 +87,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _startListeningToLocation() {
     GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
-      final newPosition = event.location.latLng;
+      final newPosition = event.location;
       if (mounted && _currentUserPosition != newPosition) {
         setState(() {
           // Store the latest user position.
