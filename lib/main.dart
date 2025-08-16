@@ -25,20 +25,19 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // Navigation and Map state
-  GoogleNavigationViewController? _navigationViewController;
+  // Use the base class controller to hold either type of controller.
+  GoogleMapViewController? _mapController;
   bool _isNavigationSessionInitialized = false;
   bool _isNavigating = false;
   List<NavigationWaypoint> _destinations = [];
   bool _isRouteLoaded = false;
 
-  // Location and Permissions state
   PermissionStatus _locationPermissionStatus = PermissionStatus.denied;
   StreamSubscription<RoadSnappedLocationUpdatedEvent>? _locationSubscription;
   LatLng? _currentUserPosition;
 
-  // Hardcoded destination
-  static const _ritzCarltonSFO = LatLng(latitude: 37.788302, longitude: -122.403209);
+  static const _ritzCarltonSFO =
+      LatLng(latitude: 37.788302, longitude: -122.403209);
 
   @override
   void initState() {
@@ -81,28 +80,25 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _isNavigationSessionInitialized = true;
       });
-      _startListeningToLocation();
     }
   }
 
-  void _startListeningToLocation() {
-    GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
+  void _startListeningToLocation(GoogleMapViewController controller) {
+    _locationSubscription?.cancel(); // Cancel any existing listener.
+    _locationSubscription =
+        GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
       final newPosition = event.location;
       if (mounted && _currentUserPosition != newPosition) {
         setState(() {
-          // Store the latest user position.
           _currentUserPosition = newPosition;
         });
 
-        // Center camera on the first valid location update.
         if (_currentUserPosition != null) {
-          _navigationViewController
-              ?.animateCamera(
+          controller
+              .animateCamera(
             CameraUpdate.newLatLngZoom(_currentUserPosition!, 14),
           )
               .then((_) {
-            // Once camera is moved, we can stop listening to location updates
-            // to avoid constant recentering of the map.
             _locationSubscription?.cancel();
           });
         }
@@ -110,21 +106,33 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _onViewCreated(GoogleNavigationViewController controller) {
-    _navigationViewController = controller;
-    _navigationViewController?.setMyLocationEnabled(true);
+  void _onMapViewCreated(GoogleMapViewController controller) {
+    setState(() {
+      _mapController = controller;
+    });
+    _mapController?.setMyLocationEnabled(true);
+    _startListeningToLocation(controller);
+  }
+
+  void _onNavigationViewCreated(GoogleNavigationViewController controller) {
+     setState(() {
+      _mapController = controller;
+    });
+    _mapController?.setMyLocationEnabled(true);
+    _startListeningToLocation(controller);
   }
 
   void _calculateAndShowRoute() {
     if (_currentUserPosition == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('現在地が取得できていません。少し待ってから再度お試しください。')),
+        const SnackBar(
+            content: Text('現在地が取得できていません。少し待ってから再度お試しください。')),
       );
       return;
     }
 
-    final destination = NavigationWaypoint(
-        title: 'The Ritz-Carlton, San Francisco', target: _ritzCarltonSFO);
+    final destination =
+        NavigationWaypoint(title: 'The Ritz-Carlton, San Francisco', target: _ritzCarltonSFO);
 
     GoogleMapsNavigator.setDestinations(Destinations(
       waypoints: [destination],
@@ -157,14 +165,21 @@ class _MapScreenState extends State<MapScreen> {
     return _isNavigating
         ? GoogleMapsNavigationView(
             key: const ValueKey('navigation_view'),
-            onViewCreated: _onViewCreated,
-            initialCameraPosition: CameraPosition(target: _currentUserPosition ?? const LatLng(latitude: 37.7749, longitude: -122.4194), zoom: 14),
-            initialNavigationUIEnabledPreference: NavigationUIEnabledPreference.automatic,
+            onViewCreated: _onNavigationViewCreated,
+            initialCameraPosition: CameraPosition(
+                target: _currentUserPosition ??
+                    const LatLng(latitude: 37.7749, longitude: -122.4194),
+                zoom: 14),
+            initialNavigationUIEnabledPreference:
+                NavigationUIEnabledPreference.automatic,
           )
         : GoogleMapsMapView(
             key: const ValueKey('map_view'),
-            onViewCreated: _onViewCreated,
-            initialCameraPosition: CameraPosition(target: _currentUserPosition ?? const LatLng(latitude: 37.7749, longitude: -122.4194), zoom: 14),
+            onViewCreated: _onMapViewCreated,
+            initialCameraPosition: CameraPosition(
+                target: _currentUserPosition ??
+                    const LatLng(latitude: 37.7749, longitude: -122.4194),
+                zoom: 14),
           );
   }
 
@@ -174,17 +189,19 @@ class _MapScreenState extends State<MapScreen> {
       appBar: AppBar(
         title: Text(_isNavigating ? 'ナビゲーション中' : 'Google Maps App'),
         backgroundColor: Colors.green[700],
-        leading: _isNavigating ? IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () {
-            setState(() {
-              _isNavigating = false;
-              _isRouteLoaded = false;
-              _destinations = [];
-              _navigationViewController?.clearDestinations();
-            });
-          },
-        ) : null,
+        leading: _isNavigating
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(() {
+                    _isNavigating = false;
+                    _isRouteLoaded = false;
+                    _destinations = [];
+                    GoogleMapsNavigator.clearDestinations();
+                  });
+                },
+              )
+            : null,
       ),
       body: _buildBody(),
       floatingActionButton: _isNavigationSessionInitialized && !_isNavigating
