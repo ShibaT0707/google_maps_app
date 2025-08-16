@@ -123,7 +123,7 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    final destination = NavigationWaypoint.withLatLng(
+    final destination = NavigationWaypoint(
         title: 'The Ritz-Carlton, San Francisco', target: _ritzCarltonSFO);
 
     _navigationViewController?.setDestinations([destination]).then((result) {
