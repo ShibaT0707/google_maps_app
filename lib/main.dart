@@ -1,11 +1,8 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:google_navigation_flutter/google_navigation_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() => runApp(const MyApp());
 
@@ -28,207 +25,178 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final Completer<GoogleMapController> _controller = Completer();
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
-  bool _isRouteDrawn = false;
+  // Navigation and Map state
+  GoogleNavigationViewController? _navigationViewController;
+  bool _isNavigationSessionInitialized = false;
+  bool _isNavigating = false;
+  List<NavigationWaypoint> _destinations = [];
+  bool _isRouteLoaded = false;
 
-  // TODO: Add your Google Maps API key
-  static const _apiKey = 'AIzaSyBji2i7e6EcdUgibJPeL7JqlBUZF-ERBW0';
+  // Location and Permissions state
+  PermissionStatus _locationPermissionStatus = PermissionStatus.denied;
+  StreamSubscription<RoadSnappedLocationUpdatedEvent>? _locationSubscription;
+  LatLng? _currentUserPosition;
 
-  static const _ritzCarltonSFO = LatLng(37.788302, -122.403209);
-
-  static const _initialCameraPosition = CameraPosition(
-    target: _ritzCarltonSFO,
-    zoom: 14.0,
-  );
+  // Hardcoded destination
+  static const _ritzCarltonSFO = LatLng(latitude: 37.788302, longitude: -122.403209);
 
   @override
   void initState() {
     super.initState();
-    _setInitialState();
+    _requestLocationPermission().then((_) {
+      if (_locationPermissionStatus == PermissionStatus.granted) {
+        _initializeNavigationSession();
+      }
+    });
   }
 
-  void _setInitialState() async {
-    // Add Ritz-Carlton marker
-    _markers.add(
-      const Marker(
-        markerId: MarkerId('ritzCarlton'),
-        position: _ritzCarltonSFO,
-        infoWindow: InfoWindow(title: 'The Ritz-Carlton, San Francisco'),
-      ),
-    );
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    if (_isNavigationSessionInitialized) {
+      GoogleMapsNavigator.cleanup();
+    }
+    super.dispose();
+  }
 
-    try {
-      // Get current location to adjust camera
-      final location = await _determinePosition();
-      final currentLatLng = LatLng(location.latitude, location.longitude);
+  Future<void> _requestLocationPermission() async {
+    final status = await Permission.location.request();
+    setState(() {
+      _locationPermissionStatus = status;
+    });
+  }
 
-      // Adjust map to show both the Ritz and the user's location
-      _updateCameraBounds(currentLatLng);
-
-    } catch (e) {
-      print(e);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('現在地の取得に失敗しました。リッツ・カールトンのみ表示します。')),
+  Future<void> _initializeNavigationSession() async {
+    if (!await GoogleMapsNavigator.areTermsAccepted()) {
+      await GoogleMapsNavigator.showTermsAndConditionsDialog(
+        'Google Maps App',
+        'Company Name',
       );
     }
 
-    // Re-render the screen to show the Ritz marker
-    setState(() {});
-  }
-
-  void _updateCameraBounds(LatLng currentUserPosition) async {
-    final GoogleMapController controller = await _controller.future;
-
-    final double minLat = min(currentUserPosition.latitude, _ritzCarltonSFO.latitude);
-    final double maxLat = max(currentUserPosition.latitude, _ritzCarltonSFO.latitude);
-    final double minLng = min(currentUserPosition.longitude, _ritzCarltonSFO.longitude);
-    final double maxLng = max(currentUserPosition.longitude, _ritzCarltonSFO.longitude);
-
-    final bounds = LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
-
-    controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 70.0));
-  }
-
-  Future<void> _goToCurrentLocation() async {
-    try {
-      final location = await _determinePosition();
-      final latLng = LatLng(location.latitude, location.longitude);
-      final GoogleMapController controller = await _controller.future;
-
-      controller.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: latLng,
-            zoom: 16.0,
-          ),
-        ),
+    if (await GoogleMapsNavigator.areTermsAccepted()) {
+      await GoogleMapsNavigator.initializeNavigationSession(
+        taskRemovedBehavior: TaskRemovedBehavior.continueService,
       );
-    } catch (e) {
-      print(e);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('現在地の取得に失敗しました。')),
-      );
+      setState(() {
+        _isNavigationSessionInitialized = true;
+      });
     }
   }
 
+  void _onViewCreated(GoogleNavigationViewController controller) {
+    _navigationViewController = controller;
+    _navigationViewController?.setMyLocationEnabled(true);
+
+    _locationSubscription = _navigationViewController?.onRoadSnappedLocationUpdated.listen((event) {
+      final newPosition = event.location.latLng;
+      if (mounted && _currentUserPosition != newPosition) {
+        setState(() {
+          _currentUserPosition = newPosition;
+        });
+        if (_currentUserPosition != null) {
+          _navigationViewController?.animateCamera(
+            CameraUpdate.newLatLngZoom(_currentUserPosition!, 14),
+          );
+          _locationSubscription?.cancel();
+        }
+      }
+    });
+  }
+
+  void _calculateAndShowRoute() {
+    if (_currentUserPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('現在地が取得できていません。少し待ってから再度お試しください。')),
+      );
+      return;
+    }
+
+    final destination = NavigationWaypoint.withLatLng(
+        title: 'The Ritz-Carlton, San Francisco', target: _ritzCarltonSFO);
+
+    _navigationViewController?.setDestinations([destination]).then((result) {
+      if (result.status == RouteStatus.ok) {
+        setState(() {
+          _destinations = [destination];
+          _isRouteLoaded = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('経路が見つかりました。')),
+        );
+      } else {
+         ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('経路の取得に失敗しました: ${result.status}')),
+        );
+      }
+    });
+  }
+
+  Widget _buildBody() {
+    if (_locationPermissionStatus != PermissionStatus.granted) {
+      return const Center(child: Text('位置情報の許可が必要です。'));
+    }
+    if (!_isNavigationSessionInitialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return _isNavigating
+        ? GoogleMapsNavigationView(
+            key: const ValueKey('navigation_view'),
+            onViewCreated: _onViewCreated,
+            initialCameraPosition: CameraPosition(target: _currentUserPosition ?? const LatLng(latitude: 37.7749, longitude: -122.4194), zoom: 14),
+            initialNavigationUIEnabledPreference: NavigationUIEnabledPreference.enabled,
+            destinations: _destinations,
+          )
+        : GoogleMapsMapView(
+            key: const ValueKey('map_view'),
+            onViewCreated: _onViewCreated,
+            initialCameraPosition: CameraPosition(target: _currentUserPosition ?? const LatLng(latitude: 37.7749, longitude: -122.4194), zoom: 14),
+          );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Google Maps App'),
+        title: Text(_isNavigating ? 'ナビゲーション中' : 'Google Maps App'),
         backgroundColor: Colors.green[700],
+        leading: _isNavigating ? IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () {
+            setState(() {
+              _isNavigating = false;
+              _isRouteLoaded = false;
+              _destinations = [];
+              _navigationViewController?.clearDestinations();
+            });
+          },
+        ) : null,
       ),
-      body: GoogleMap(
-        initialCameraPosition: _initialCameraPosition,
-        myLocationEnabled: true, // Enable the blue dot for current location
-        myLocationButtonEnabled: false, // We use our own button
-        markers: _markers,
-        polylines: _polylines,
-        onMapCreated: (controller) {
-          _controller.complete(controller);
-        },
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            onPressed: () => _getDirectionsAndDrawRoute(_ritzCarltonSFO),
-            child: const Icon(Icons.directions),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            onPressed: _goToCurrentLocation,
-            child: const Icon(Icons.my_location),
-          ),
-          const SizedBox(height: 16),
-          if (_isRouteDrawn)
-            FloatingActionButton.extended(
-              onPressed: () => _launchGoogleMapsNavigation(_ritzCarltonSFO),
-              label: const Text('Navigation'),
-              icon: const Icon(Icons.navigation),
-            ),
-        ],
-      ),
+      body: _buildBody(),
+      floatingActionButton: _isNavigationSessionInitialized && !_isNavigating
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  onPressed: _calculateAndShowRoute,
+                  child: const Icon(Icons.directions),
+                ),
+                const SizedBox(height: 16),
+                if (_isRouteLoaded)
+                  FloatingActionButton.extended(
+                    onPressed: () {
+                      setState(() {
+                        _isNavigating = true;
+                      });
+                    },
+                    label: const Text('Navigation'),
+                    icon: const Icon(Icons.navigation),
+                  ),
+              ],
+            )
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
-  }
-
-  /// Determines the current position of the device.
-  Future<Position> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      return Future.error('Location services are disabled.');
-    }
-
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        return Future.error('Location permissions are denied');
-      }
-    }
-
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error(
-          'Location permissions are permanently denied, we cannot request permissions.');
-    }
-
-    return await Geolocator.getCurrentPosition();
-  }
-
-  Future<void> _getDirectionsAndDrawRoute(LatLng destination) async {
-    // Get current location
-    final Position position = await _determinePosition();
-    final LatLng origin = LatLng(position.latitude, position.longitude);
-
-    // Get polyline points
-    final PolylinePoints polylinePoints = PolylinePoints(apiKey: _apiKey);
-    final PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      request: PolylineRequest(
-        origin: PointLatLng(origin.latitude, origin.longitude),
-        destination: PointLatLng(destination.latitude, destination.longitude),
-        mode: TravelMode.driving,
-      ),
-    );
-
-    if (result.points.isNotEmpty) {
-      final List<LatLng> polylineCoordinates = [];
-      result.points.forEach((point) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      });
-
-      setState(() {
-        _polylines.clear(); // Clear old routes
-        final Polyline polyline = Polyline(
-          polylineId: const PolylineId('route'),
-          color: Colors.blue,
-          points: polylineCoordinates,
-          width: 5,
-        );
-        _polylines.add(polyline);
-        _isRouteDrawn = true;
-      });
-    }
-  }
-
-  Future<void> _launchGoogleMapsNavigation(LatLng destination) async {
-    final uri = Uri.parse(
-        'https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}&travelmode=driving');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Googleマップを起動できませんでした。')),
-      );
-    }
   }
 }
