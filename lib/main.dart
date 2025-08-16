@@ -83,9 +83,8 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _addDestinationMarker() {
-    if (_mapController == null) return;
-    _mapController!.addMarkers([
+  void _addDestinationMarker(GoogleMapViewController controller) {
+    controller.addMarkers([
       MarkerOptions(
         position: _ritzCarltonSFO,
         infoWindow: const InfoWindowOptions(title: 'The Ritz-Carlton'),
@@ -119,8 +118,8 @@ class _MapScreenState extends State<MapScreen> {
       _mapController = controller;
       _cameraCentered = false;
     });
-    _mapController?.setMyLocationEnabled(true);
-    _addDestinationMarker();
+    controller.setMyLocationEnabled(true);
+    _addDestinationMarker(controller);
     _startListeningToLocation(controller);
   }
 
@@ -129,8 +128,8 @@ class _MapScreenState extends State<MapScreen> {
       _mapController = controller;
       _cameraCentered = false;
     });
-    _mapController?.setMyLocationEnabled(true);
-    _addDestinationMarker();
+    controller.setMyLocationEnabled(true);
+    _addDestinationMarker(controller);
     _startListeningToLocation(controller);
   }
 
