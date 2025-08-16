@@ -81,27 +81,38 @@ class _MapScreenState extends State<MapScreen> {
       setState(() {
         _isNavigationSessionInitialized = true;
       });
+      _startListeningToLocation();
     }
+  }
+
+  void _startListeningToLocation() {
+    GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
+      final newPosition = event.location.latLng;
+      if (mounted && _currentUserPosition != newPosition) {
+        setState(() {
+          // Store the latest user position.
+          _currentUserPosition = newPosition;
+        });
+
+        // Center camera on the first valid location update.
+        if (_currentUserPosition != null) {
+          _navigationViewController
+              ?.animateCamera(
+            CameraUpdate.newLatLngZoom(_currentUserPosition!, 14),
+          )
+              .then((_) {
+            // Once camera is moved, we can stop listening to location updates
+            // to avoid constant recentering of the map.
+            _locationSubscription?.cancel();
+          });
+        }
+      }
+    });
   }
 
   void _onViewCreated(GoogleNavigationViewController controller) {
     _navigationViewController = controller;
     _navigationViewController?.setMyLocationEnabled(true);
-
-    _locationSubscription = _navigationViewController?.onRoadSnappedLocationUpdated.listen((event) {
-      final newPosition = event.location.latLng;
-      if (mounted && _currentUserPosition != newPosition) {
-        setState(() {
-          _currentUserPosition = newPosition;
-        });
-        if (_currentUserPosition != null) {
-          _navigationViewController?.animateCamera(
-            CameraUpdate.newLatLngZoom(_currentUserPosition!, 14),
-          );
-          _locationSubscription?.cancel();
-        }
-      }
-    });
   }
 
   void _calculateAndShowRoute() {
