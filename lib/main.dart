@@ -221,7 +221,8 @@ class _MapScreenState extends State<MapScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 FloatingActionButton(
-                  onPressed: _calculateAndShowRoute,
+                  onPressed: _currentUserPosition == null ? null : _calculateAndShowRoute,
+                  backgroundColor: _currentUserPosition == null ? Colors.grey : Theme.of(context).colorScheme.secondary,
                   child: const Icon(Icons.directions),
                 ),
                 const SizedBox(height: 16),
