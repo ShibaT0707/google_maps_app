@@ -11,7 +11,7 @@ class SpeechService {
   // Callback to notify the UI about status changes
   void Function(String)? onStatusChanged;
 
-  Future<void> initialize({
+  Future<bool> initialize({
     required void Function(String) onResult,
     required void Function(String) onStatusChanged,
   }) async {
@@ -22,37 +22,30 @@ class SpeechService {
       onStatus: _onStatus,
       onError: (error) => print('Speech recognition error: $error'),
     );
-
-    if (_speechEnabled) {
-      _startListening();
-    }
+    return _speechEnabled;
   }
 
-  void _startListening() {
+  void listen({
+    required String localeId,
+    Duration? listenFor,
+    Duration? pauseFor,
+  }) {
     if (!_speechEnabled) {
-      print("The user has not granted speech recognition permission");
+      print("Speech service not initialized or permission denied.");
       return;
     }
     _speechToText.listen(
       onResult: _onSpeechResult,
-      listenFor: const Duration(days: 1),
-      pauseFor: const Duration(seconds: 5),
+      listenFor: listenFor,
+      pauseFor: pauseFor,
       partialResults: true,
-      localeId: 'ja_JP', // Set locale to Japanese
+      localeId: localeId,
     );
   }
 
   void _onStatus(String status) {
     if (onStatusChanged != null) {
       onStatusChanged!(status);
-    }
-
-    // When the status is 'done' or 'notListening', restart the listening session.
-    if (status == SpeechToText.doneStatus || status == SpeechToText.notListeningStatus) {
-      // Add a small delay before restarting to avoid rapid looping on some devices
-      Future.delayed(const Duration(milliseconds: 500), () {
-        _startListening();
-      });
     }
   }
 
@@ -62,11 +55,11 @@ class SpeechService {
     }
   }
 
-  void stopListening() {
+  void stop() {
     _speechToText.stop();
   }
 
-  void cancelListening() {
+  void cancel() {
     _speechToText.cancel();
   }
 }
