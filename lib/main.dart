@@ -25,12 +25,12 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  // Use the base class controller to hold either type of controller.
   GoogleMapViewController? _mapController;
   bool _isNavigationSessionInitialized = false;
   bool _isNavigating = false;
   List<NavigationWaypoint> _destinations = [];
   bool _isRouteLoaded = false;
+  bool _cameraCentered = false;
 
   PermissionStatus _locationPermissionStatus = PermissionStatus.denied;
   StreamSubscription<RoadSnappedLocationUpdatedEvent>? _locationSubscription;
@@ -52,7 +52,6 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     if (status == PermissionStatus.granted) {
-      // Only initialize navigation if permission is granted.
       await _initializeNavigationSession();
     }
   }
@@ -84,23 +83,31 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  void _addDestinationMarker() {
+    if (_mapController == null) return;
+    _mapController!.addMarkers([
+      MarkerOptions(
+        position: _ritzCarltonSFO,
+        infoWindow: const InfoWindowOptions(title: 'The Ritz-Carlton'),
+      ),
+    ]);
+  }
+
   Future<void> _startListeningToLocation(GoogleMapViewController controller) async {
-    await _locationSubscription?.cancel(); // Cancel any existing listener.
+    await _locationSubscription?.cancel();
     _locationSubscription =
         await GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
-      final newPosition = event.location;
-      if (mounted && _currentUserPosition != newPosition) {
+      if (mounted) {
         setState(() {
-          _currentUserPosition = newPosition;
+          _currentUserPosition = event.location;
         });
 
-        if (_currentUserPosition != null) {
-          controller
-              .animateCamera(
+        if (!_cameraCentered && _currentUserPosition != null) {
+          controller.animateCamera(
             CameraUpdate.newLatLngZoom(_currentUserPosition!, 14),
-          )
-              .then((_) {
-            _locationSubscription?.cancel();
+          );
+          setState(() {
+            _cameraCentered = true;
           });
         }
       }
@@ -110,16 +117,20 @@ class _MapScreenState extends State<MapScreen> {
   void _onMapViewCreated(GoogleMapViewController controller) {
     setState(() {
       _mapController = controller;
+      _cameraCentered = false;
     });
     _mapController?.setMyLocationEnabled(true);
+    _addDestinationMarker();
     _startListeningToLocation(controller);
   }
 
   void _onNavigationViewCreated(GoogleNavigationViewController controller) {
-     setState(() {
+    setState(() {
       _mapController = controller;
+      _cameraCentered = false;
     });
     _mapController?.setMyLocationEnabled(true);
+    _addDestinationMarker();
     _startListeningToLocation(controller);
   }
 
@@ -198,6 +209,7 @@ class _MapScreenState extends State<MapScreen> {
                     _isNavigating = false;
                     _isRouteLoaded = false;
                     _destinations = [];
+                    _cameraCentered = false;
                     GoogleMapsNavigator.clearDestinations();
                   });
                 },
