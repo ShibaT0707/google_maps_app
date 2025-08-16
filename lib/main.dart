@@ -159,7 +159,7 @@ class _MapScreenState extends State<MapScreen> {
             key: const ValueKey('navigation_view'),
             onViewCreated: _onViewCreated,
             initialCameraPosition: CameraPosition(target: _currentUserPosition ?? const LatLng(latitude: 37.7749, longitude: -122.4194), zoom: 14),
-            initialNavigationUIEnabledPreference: NavigationUIEnabledPreference.enabled,
+            initialNavigationUIEnabledPreference: NavigationUIEnabledPreference.automatic,
             destinations: _destinations,
           )
         : GoogleMapsMapView(
