@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() => runApp(const MyApp());
 
@@ -30,6 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
+  bool _isRouteDrawn = false;
 
   // TODO: Add your Google Maps API key
   static const _apiKey = 'AIzaSyBji2i7e6EcdUgibJPeL7JqlBUZF-ERBW0';
@@ -144,6 +146,13 @@ class _MapScreenState extends State<MapScreen> {
             onPressed: _goToCurrentLocation,
             child: const Icon(Icons.my_location),
           ),
+          const SizedBox(height: 16),
+          if (_isRouteDrawn)
+            FloatingActionButton.extended(
+              onPressed: () => _launchGoogleMapsNavigation(_ritzCarltonSFO),
+              label: const Text('Navigation'),
+              icon: const Icon(Icons.navigation),
+            ),
         ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
@@ -198,6 +207,7 @@ class _MapScreenState extends State<MapScreen> {
       });
 
       setState(() {
+        _polylines.clear(); // Clear old routes
         final Polyline polyline = Polyline(
           polylineId: const PolylineId('route'),
           color: Colors.blue,
@@ -205,7 +215,20 @@ class _MapScreenState extends State<MapScreen> {
           width: 5,
         );
         _polylines.add(polyline);
+        _isRouteDrawn = true;
       });
+    }
+  }
+
+  Future<void> _launchGoogleMapsNavigation(LatLng destination) async {
+    final uri = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=${destination.latitude},${destination.longitude}&travelmode=driving');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Googleマップを起動できませんでした。')),
+      );
     }
   }
 }
