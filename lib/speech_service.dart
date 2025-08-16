@@ -17,8 +17,16 @@ class SpeechService {
   }) async {
     this.onResult = onResult;
     this.onListeningStopped = onListeningStopped;
-    _speechEnabled = await _speechToText.initialize();
-    _startListening();
+
+    // The status listener is passed to initialize, not listen.
+    _speechEnabled = await _speechToText.initialize(
+      onStatus: _onStatus,
+      onError: (error) => print('Speech recognition error: $error'),
+    );
+
+    if (_speechEnabled) {
+      _startListening();
+    }
   }
 
   void _startListening() {
@@ -28,18 +36,25 @@ class SpeechService {
     }
     _speechToText.listen(
       onResult: _onSpeechResult,
-      listenFor: const Duration(days: 1), // Listen for a long time
-      pauseFor: const Duration(seconds: 5), // Pause after 5s of silence
-      onStatus: (status) {
-        // When listening stops, restart it.
-        if (status == 'done' || status == 'notListening') {
-          _startListening();
-          if (onListeningStopped != null) {
-            onListeningStopped!();
-          }
-        }
-      },
+      listenFor: const Duration(days: 1),
+      pauseFor: const Duration(seconds: 5),
+      partialResults: true, // Keep getting results
     );
+  }
+
+  void _onStatus(String status) {
+    print('Speech recognition status: $status');
+    // When the status is 'done' or 'notListening', it means the listening
+    // session has ended for some reason (e.g., silence). Restart it.
+    if (status == SpeechToText.doneStatus || status == SpeechToText.notListeningStatus) {
+      if (onListeningStopped != null) {
+        onListeningStopped!();
+      }
+      // Add a small delay before restarting to avoid rapid looping on some devices
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _startListening();
+      });
+    }
   }
 
   void _onSpeechResult(SpeechRecognitionResult result) {
@@ -57,7 +72,7 @@ class SpeechService {
 
   void cancelListening() {
     _speechToText.cancel();
-     if (onListeningStopped != null) {
+    if (onListeningStopped != null) {
       onListeningStopped!();
     }
   }
