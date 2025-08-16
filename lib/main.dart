@@ -35,6 +35,7 @@ class _MapScreenState extends State<MapScreen> {
   PermissionStatus _locationPermissionStatus = PermissionStatus.denied;
   StreamSubscription<RoadSnappedLocationUpdatedEvent>? _locationSubscription;
   LatLng? _currentUserPosition;
+  NavigationTravelMode _travelMode = NavigationTravelMode.driving;
 
   static const _ritzCarltonSFO =
       LatLng(latitude: 37.788302, longitude: -122.403209);
@@ -149,6 +150,7 @@ class _MapScreenState extends State<MapScreen> {
     GoogleMapsNavigator.setDestinations(Destinations(
       waypoints: [destination],
       displayOptions: NavigationDisplayOptions(showDestinationMarkers: true),
+      routingOptions: RoutingOptions(travelMode: _travelMode),
     )).then((result) {
       if (result == NavigationRouteStatus.statusOk) {
         setState(() {
@@ -212,6 +214,34 @@ class _MapScreenState extends State<MapScreen> {
                   });
                 },
               )
+            : null,
+        actions: !_isNavigating
+            ? [
+                DropdownButton<NavigationTravelMode>(
+                  value: _travelMode,
+                  onChanged: (NavigationTravelMode? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _travelMode = newValue;
+                        // If a route is already loaded, recalculate it with the new travel mode
+                        if (_isRouteLoaded) {
+                          _calculateAndShowRoute();
+                        }
+                      });
+                    }
+                  },
+                  items: const [
+                    DropdownMenuItem(
+                      value: NavigationTravelMode.driving,
+                      child: Text('Driving'),
+                    ),
+                    DropdownMenuItem(
+                      value: NavigationTravelMode.twoWheeler,
+                      child: Text('Two-Wheeler'),
+                    ),
+                  ],
+                ),
+              ]
             : null,
       ),
       body: _buildBody(),
