@@ -83,10 +83,10 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _startListeningToLocation(GoogleMapViewController controller) {
-    _locationSubscription?.cancel(); // Cancel any existing listener.
+  Future<void> _startListeningToLocation(GoogleMapViewController controller) async {
+    await _locationSubscription?.cancel(); // Cancel any existing listener.
     _locationSubscription =
-        GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
+        await GoogleMapsNavigator.setRoadSnappedLocationUpdatedListener((event) {
       final newPosition = event.location;
       if (mounted && _currentUserPosition != newPosition) {
         setState(() {
