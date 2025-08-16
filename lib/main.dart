@@ -87,7 +87,7 @@ class _MapScreenState extends State<MapScreen> {
     controller.addMarkers([
       MarkerOptions(
         position: _ritzCarltonSFO,
-        infoWindow: const InfoWindowOptions(title: 'The Ritz-Carlton'),
+        infoWindow: const InfoWindow(title: 'The Ritz-Carlton'),
       ),
     ]);
   }
