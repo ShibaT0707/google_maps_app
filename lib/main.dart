@@ -126,7 +126,10 @@ class _MapScreenState extends State<MapScreen> {
     final destination = NavigationWaypoint(
         title: 'The Ritz-Carlton, San Francisco', target: _ritzCarltonSFO);
 
-    _navigationViewController?.setDestinations([destination]).then((result) {
+    GoogleMapsNavigator.setDestinations(Destinations(
+      waypoints: [destination],
+      displayOptions: NavigationDisplayOptions(showDestinationMarkers: true),
+    )).then((result) {
       if (result.status == RouteStatus.ok) {
         setState(() {
           _destinations = [destination];
@@ -136,7 +139,7 @@ class _MapScreenState extends State<MapScreen> {
           const SnackBar(content: Text('経路が見つかりました。')),
         );
       } else {
-         ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('経路の取得に失敗しました: ${result.status}')),
         );
       }
