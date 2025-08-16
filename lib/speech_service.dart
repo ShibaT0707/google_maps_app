@@ -30,12 +30,13 @@ class SpeechService {
       onResult: _onSpeechResult,
       listenFor: const Duration(days: 1), // Listen for a long time
       pauseFor: const Duration(seconds: 5), // Pause after 5s of silence
-      onDone: () {
-        // This is called when the listen session is finished.
-        // We want to restart it to have continuous listening.
-        _startListening();
-        if (onListeningStopped != null) {
-          onListeningStopped!();
+      onStatus: (status) {
+        // When listening stops, restart it.
+        if (status == 'done' || status == 'notListening') {
+          _startListening();
+          if (onListeningStopped != null) {
+            onListeningStopped!();
+          }
         }
       },
     );
