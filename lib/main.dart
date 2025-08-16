@@ -4,6 +4,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'dart:convert';
 
 void main() => runApp(const MyApp());
 
@@ -28,6 +31,10 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+
+  // TODO: Add your Google Maps API key
+  static const _apiKey = 'AIzaSyBji2i7e6EcdUgibJPeL7JqlBUZF-ERBW0';
 
   static const _ritzCarltonSFO = LatLng(37.788302, -122.403209);
 
@@ -122,13 +129,24 @@ class _MapScreenState extends State<MapScreen> {
         myLocationEnabled: true, // Enable the blue dot for current location
         myLocationButtonEnabled: false, // We use our own button
         markers: _markers,
+        polylines: _polylines,
         onMapCreated: (controller) {
           _controller.complete(controller);
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _goToCurrentLocation,
-        child: const Icon(Icons.my_location),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () => _getDirectionsAndDrawRoute(_ritzCarltonSFO),
+            child: const Icon(Icons.directions),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            onPressed: _goToCurrentLocation,
+            child: const Icon(Icons.my_location),
+          ),
+        ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
@@ -158,5 +176,41 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     return await Geolocator.getCurrentPosition();
+  }
+
+  Future<void> _getDirectionsAndDrawRoute(LatLng destination) async {
+    // Get current location
+    final Position position = await _determinePosition();
+    final LatLng origin = LatLng(position.latitude, position.longitude);
+
+    // Get polyline points
+    final PolylinePoints polylinePoints = PolylinePoints();
+    final String url =
+        'https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&key=$_apiKey';
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['routes'].isNotEmpty) {
+        final points = polylinePoints.decodePolyline(data['routes'][0]['overview_polyline']['points']);
+        if (points.isNotEmpty) {
+          final List<LatLng> polylineCoordinates = [];
+          points.forEach((point) {
+            polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+          });
+
+          setState(() {
+            final Polyline polyline = Polyline(
+              polylineId: const PolylineId('route'),
+              color: Colors.blue,
+              points: polylineCoordinates,
+              width: 5,
+            );
+            _polylines.add(polyline);
+          });
+        }
+      }
+    }
   }
 }
