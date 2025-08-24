@@ -51,7 +51,7 @@ class _MapScreenState extends State<MapScreen> {
   String? _destinationName;
 
   VoiceProcessor? _voiceProcessor;
-  PorcupineManager? _porcupineManager;
+  Porcupine? _porcupine;
   Cheetah? _cheetah;
   bool _isListening = false;
   String _transcript = "";
@@ -80,31 +80,25 @@ class _MapScreenState extends State<MapScreen> {
   void _initPicovoice() async {
     try {
       _voiceProcessor = VoiceProcessor.instance;
-      _porcupineManager = await PorcupineManager.fromKeywordPaths(
+      _porcupine = await Porcupine.fromKeywordPaths(
         _accessKey,
         ["assets/picovoice/blueberry_android.ppn"],
-        _wakeWordCallback,
         modelPath: "assets/picovoice/porcupine_params.pv",
-        errorCallback: _errorCallback,
       );
-
-      await _porcupineManager?.start();
       _voiceProcessor?.addFrameListener(_porcupineFrameListener);
-      _voiceProcessor?.start(2048, 16000);
+      _voiceProcessor?.start(_porcupine!.frameLength, _porcupine!.sampleRate);
     } on PorcupineException catch (e) {
       _errorCallback(e);
     }
   }
 
-  void _wakeWordCallback(int keywordIndex) async {
-    if (keywordIndex == 0) {
-      setState(() {
-        _isListening = true;
-        _transcript = "Listening...";
-      });
-      await _stopPorcupine();
-      await _startCheetah();
-    }
+  void _wakeWordDetected() async {
+    setState(() {
+      _isListening = true;
+      _transcript = "Listening...";
+    });
+    _voiceProcessor?.removeFrameListener(_porcupineFrameListener);
+    await _startCheetah();
   }
 
   void _errorCallback(dynamic error) {
@@ -113,8 +107,16 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  void _porcupineFrameListener(List<int> frame) {
-    _porcupineManager?.process(frame);
+  void _porcupineFrameListener(List<int> frame) async {
+    if (_porcupine == null) return;
+    try {
+      final keywordIndex = _porcupine!.process(frame);
+      if (keywordIndex >= 0) {
+        _wakeWordDetected();
+      }
+    } on PorcupineException catch (e) {
+      _errorCallback(e);
+    }
   }
 
   Future<void> _startCheetah() async {
@@ -169,17 +171,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _startPorcupine() async {
-    if (_porcupineManager == null) {
-      _initPicovoice();
-    } else {
-      await _porcupineManager?.start();
-      _voiceProcessor?.addFrameListener(_porcupineFrameListener);
-    }
-  }
-
-  Future<void> _stopPorcupine() async {
-    await _porcupineManager?.stop();
-    _voiceProcessor?.removeFrameListener(_porcupineFrameListener);
+    _voiceProcessor?.addFrameListener(_porcupineFrameListener);
   }
 
   @override
@@ -189,7 +181,7 @@ class _MapScreenState extends State<MapScreen> {
       GoogleMapsNavigator.cleanup();
     }
     _voiceProcessor?.stop();
-    _porcupineManager?.delete();
+    _porcupine?.delete();
     _cheetah?.delete();
     super.dispose();
   }
