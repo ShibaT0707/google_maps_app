@@ -8,7 +8,7 @@ import 'package:places_service/places_service.dart';
 import 'search_screen.dart';
 
 Future<void> main() async {
-  await dotenv.load();
+  await dotenv.load(fileName: "assets/.env");
   runApp(const MyApp());
 }
 
