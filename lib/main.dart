@@ -107,7 +107,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void _errorCallback(PicovoiceException error) {
+  void _errorCallback(dynamic error) {
     setState(() {
       _transcript = error.message!;
     });
@@ -126,7 +126,7 @@ class _MapScreenState extends State<MapScreen> {
       );
       _voiceProcessor?.addFrameListener(_cheetahFrameListener);
     } on CheetahException catch (e) {
-      _errorCallback(e as PicovoiceException);
+      _errorCallback(e);
     }
   }
 
