@@ -36,7 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_dotenv: ^5.1.0
   places_service: ^0.1.4
-  geolocator: ^14.0.2
+  geolocator: ^11.1.0
   google_maps_flutter_platform_interface: ^2.12.1
   google_navigation_flutter: ^0.6.4
   permission_handler: ^11.3.1
