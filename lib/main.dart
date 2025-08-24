@@ -84,7 +84,6 @@ class _MapScreenState extends State<MapScreen> {
       _porcupine = await Porcupine.fromBuiltInKeywords(
         _accessKey,
         [BuiltInKeyword.BLUEBERRY],
-        modelPath: "assets/picovoice/porcupine_params.pv",
       );
       _voiceProcessor?.addFrameListener(_porcupineFrameListener);
       _voiceProcessor?.start(_porcupine!.frameLength, _porcupine!.sampleRate);
