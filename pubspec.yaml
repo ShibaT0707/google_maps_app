@@ -40,8 +40,8 @@ dependencies:
   google_maps_flutter_platform_interface: ^2.12.1
   google_navigation_flutter: ^0.6.4
   permission_handler: ^11.3.1
-  porcupine_flutter: ^3.0.4
-  cheetah_flutter: ^3.0.3
+  porcupine_flutter: ^3.0.5
+  cheetah_flutter: ^2.2.0
   flutter_voice_processor: ^1.0.3
 
 
