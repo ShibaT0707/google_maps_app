@@ -68,7 +68,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 return ListTile(
                   title: Text(prediction.description ?? ''),
                   onTap: () {
-                    Navigator.pop(context, prediction.placeId);
+                    Navigator.pop(context, prediction);
                   },
                 );
               },

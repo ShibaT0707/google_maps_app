@@ -177,20 +177,19 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _showSearch() async {
-    final placeId = await Navigator.push<String>(
+    final prediction = await Navigator.push<PlacesAutoCompletePrediction>(
       context,
       MaterialPageRoute(
         builder: (context) => SearchScreen(placesService: _placesService),
       ),
     );
 
-    if (placeId != null) {
-      final details = await _placesService.getPlaceDetails(placeId);
-      if (details != null && details.geometry != null) {
-        final location = details.geometry!.location;
+    if (prediction != null && prediction.placeId != null) {
+      final details = await _placesService.getPlaceDetails(prediction.placeId!);
+      if (details != null && details.lat != null && details.lng != null) {
         setState(() {
-          _destination = LatLng(latitude: location.lat, longitude: location.lng);
-          _destinationName = details.name;
+          _destination = LatLng(latitude: details.lat!, longitude: details.lng!);
+          _destinationName = prediction.description;
           _isRouteLoaded = false;
         });
 
