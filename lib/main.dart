@@ -177,7 +177,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _showSearch() async {
-    final prediction = await Navigator.push<PlacesAutoCompletePrediction>(
+    final prediction = await Navigator.push<PlacesAutoCompleteResult>(
       context,
       MaterialPageRoute(
         builder: (context) => SearchScreen(placesService: _placesService),

@@ -12,7 +12,7 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  List<PlacesAutoCompletePrediction> _predictions = [];
+  List<PlacesAutoCompleteResult> _predictions = [];
   Timer? _debounce;
 
   @override
