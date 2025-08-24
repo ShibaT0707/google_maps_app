@@ -110,7 +110,7 @@ class _MapScreenState extends State<MapScreen> {
   void _porcupineFrameListener(List<int> frame) async {
     if (_porcupine == null) return;
     try {
-      final keywordIndex = _porcupine!.process(frame);
+      final keywordIndex = await _porcupine!.process(frame);
       if (keywordIndex >= 0) {
         _wakeWordDetected();
       }
