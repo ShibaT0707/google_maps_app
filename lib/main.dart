@@ -5,6 +5,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:places_service/places_service.dart';
+import 'package:porcupine_flutter/porcupine_manager.dart';
+import 'package:porcupine_flutter/porcupine_error.dart';
+import 'package:cheetah_flutter/cheetah.dart';
+import 'package:cheetah_flutter/cheetah_error.dart';
+import 'package:flutter_voice_processor/flutter_voice_processor.dart';
 import 'search_screen.dart';
 
 Future<void> main() async {
@@ -45,12 +50,20 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? _destination;
   String? _destinationName;
 
+  VoiceProcessor? _voiceProcessor;
+  PorcupineManager? _porcupineManager;
+  Cheetah? _cheetah;
+  bool _isListening = false;
+  String _transcript = "";
+
   @override
   void initState() {
     super.initState();
     _init();
     _placesService.initialize(apiKey: dotenv.env['GOOGLE_MAPS_API_KEY']!);
   }
+
+  final String _accessKey = "Egp/2jlwIi6904XG3pGI+EftUJ4/6ubuap3a7hHWK3jKopEPZ2rb/w==";
 
   Future<void> _init() async {
     final status = await Permission.location.request();
@@ -60,7 +73,113 @@ class _MapScreenState extends State<MapScreen> {
 
     if (status == PermissionStatus.granted) {
       await _initializeNavigationSession();
+      _initPicovoice();
     }
+  }
+
+  void _initPicovoice() async {
+    try {
+      _voiceProcessor = VoiceProcessor.instance;
+      _porcupineManager = await PorcupineManager.fromKeywordPaths(
+        _accessKey,
+        ["assets/picovoice/blueberry_android.ppn"],
+        _wakeWordCallback,
+        modelPath: "assets/picovoice/porcupine_params.pv",
+        errorCallback: _errorCallback,
+      );
+
+      await _porcupineManager?.start();
+      _voiceProcessor?.addFrameListener(_porcupineFrameListener);
+      _voiceProcessor?.start(2048, 16000);
+    } on PorcupineException catch (e) {
+      _errorCallback(e);
+    }
+  }
+
+  void _wakeWordCallback(int keywordIndex) async {
+    if (keywordIndex == 0) {
+      setState(() {
+        _isListening = true;
+        _transcript = "Listening...";
+      });
+      await _stopPorcupine();
+      await _startCheetah();
+    }
+  }
+
+  void _errorCallback(PicovoiceException error) {
+    setState(() {
+      _transcript = error.message!;
+    });
+  }
+
+  void _porcupineFrameListener(List<int> frame) {
+    _porcupineManager?.process(frame);
+  }
+
+  Future<void> _startCheetah() async {
+    try {
+      _cheetah = await Cheetah.create(
+        _accessKey,
+        "assets/picovoice/cheetah_params_ja.pv",
+        endpointDurationSec: 1.0,
+      );
+      _voiceProcessor?.addFrameListener(_cheetahFrameListener);
+    } on CheetahException catch (e) {
+      _errorCallback(e as PicovoiceException);
+    }
+  }
+
+  Future<void> _stopCheetah() async {
+    _voiceProcessor?.removeFrameListener(_cheetahFrameListener);
+    final result = await _cheetah?.flush();
+    setState(() {
+      _transcript = result ?? "";
+      _isListening = false;
+    });
+    await _cheetah?.delete();
+    _cheetah = null;
+    await _startPorcupine();
+  }
+
+  Timer? _endpointTimer;
+
+  void _cheetahFrameListener(List<int> frame) async {
+    if (_cheetah == null) return;
+
+    final partialTranscript = await _cheetah!.process(frame);
+    if (partialTranscript.isNotEmpty) {
+      setState(() {
+        _transcript = partialTranscript;
+      });
+      _endpointTimer?.cancel();
+      _endpointTimer = Timer(const Duration(seconds: 1), () {
+        _stopCheetah();
+      });
+    }
+
+    if (_cheetah!.isEndpoint) {
+      final finalTranscript = await _cheetah!.flush();
+      setState(() {
+        _transcript = finalTranscript;
+      });
+      _endpointTimer?.cancel();
+      await _stopCheetah();
+    }
+  }
+
+  Future<void> _startPorcupine() async {
+    if (_porcupineManager == null) {
+      _initPicovoice();
+    } else {
+      await _porcupineManager?.start();
+      _voiceProcessor?.addFrameListener(_porcupineFrameListener);
+    }
+  }
+
+  Future<void> _stopPorcupine() async {
+    await _porcupineManager?.stop();
+    _voiceProcessor?.removeFrameListener(_porcupineFrameListener);
   }
 
   @override
@@ -69,6 +188,9 @@ class _MapScreenState extends State<MapScreen> {
     if (_isNavigationSessionInitialized) {
       GoogleMapsNavigator.cleanup();
     }
+    _voiceProcessor?.stop();
+    _porcupineManager?.delete();
+    _cheetah?.delete();
     super.dispose();
   }
 
@@ -215,19 +337,43 @@ class _MapScreenState extends State<MapScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return _isNavigating
-        ? GoogleMapsNavigationView(
-            key: const ValueKey('navigation_view'),
-            onViewCreated: _onNavigationViewCreated,
-            initialCameraPosition: initialCameraPosition,
-            initialNavigationUIEnabledPreference:
-                NavigationUIEnabledPreference.automatic,
-          )
-        : GoogleMapsMapView(
-            key: const ValueKey('map_view'),
-            onViewCreated: _onMapViewCreated,
-            initialCameraPosition: initialCameraPosition,
-          );
+    return Stack(
+      children: [
+        _isNavigating
+            ? GoogleMapsNavigationView(
+                key: const ValueKey('navigation_view'),
+                onViewCreated: _onNavigationViewCreated,
+                initialCameraPosition: initialCameraPosition,
+                initialNavigationUIEnabledPreference:
+                    NavigationUIEnabledPreference.automatic,
+              )
+            : GoogleMapsMapView(
+                key: const ValueKey('map_view'),
+                onViewCreated: _onMapViewCreated,
+                initialCameraPosition: initialCameraPosition,
+              ),
+        if (_isListening || _transcript.isNotEmpty)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    _transcript,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
