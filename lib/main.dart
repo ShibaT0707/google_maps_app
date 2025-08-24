@@ -10,6 +10,7 @@ import 'package:porcupine_flutter/porcupine_error.dart';
 import 'package:cheetah_flutter/cheetah.dart';
 import 'package:cheetah_flutter/cheetah_error.dart';
 import 'package:flutter_voice_processor/flutter_voice_processor.dart';
+import 'dart:io' show Platform;
 import 'search_screen.dart';
 
 Future<void> main() async {
@@ -78,11 +79,21 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _initPicovoice() async {
+    String keywordPath;
+    if (Platform.isAndroid) {
+      keywordPath = "assets/picovoice/blueberry_android.ppn";
+    } else if (Platform.isIOS) {
+      keywordPath = "assets/picovoice/blueberry_ios.ppn";
+    } else {
+      print("Unsupported platform");
+      return;
+    }
+
     try {
       _voiceProcessor = VoiceProcessor.instance;
       _porcupine = await Porcupine.fromKeywordPaths(
         _accessKey,
-        ["assets/picovoice/blueberry_android.ppn"],
+        [keywordPath],
         modelPath: "assets/picovoice/porcupine_params.pv",
       );
       _voiceProcessor?.addFrameListener(_porcupineFrameListener);
