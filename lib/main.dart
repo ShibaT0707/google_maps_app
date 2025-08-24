@@ -124,7 +124,7 @@ class _MapScreenState extends State<MapScreen> {
       _cheetah = await Cheetah.create(
         _accessKey,
         "assets/picovoice/cheetah_params_ja.pv",
-        endpointDurationSec: 1.0,
+        enableAutomaticPunctuation: true,
       );
       _voiceProcessor?.addFrameListener(_cheetahFrameListener);
     } on CheetahException catch (e) {
@@ -132,11 +132,9 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Future<void> _stopCheetah() async {
+  Future<void> _stopCheetahAndRestartPorcupine() async {
     _voiceProcessor?.removeFrameListener(_cheetahFrameListener);
-    final result = await _cheetah?.flush();
     setState(() {
-      _transcript = result ?? "";
       _isListening = false;
     });
     await _cheetah?.delete();
@@ -144,29 +142,27 @@ class _MapScreenState extends State<MapScreen> {
     await _startPorcupine();
   }
 
-  Timer? _endpointTimer;
-
   void _cheetahFrameListener(List<int> frame) async {
     if (_cheetah == null) return;
+    try {
+      final partialResult = await _cheetah!.process(frame);
+      if (partialResult.transcript.isNotEmpty) {
+        setState(() {
+          _transcript = _transcript == "Listening..."
+              ? partialResult.transcript
+              : _transcript + partialResult.transcript;
+        });
+      }
 
-    final partialTranscript = await _cheetah!.process(frame);
-    if (partialTranscript.isNotEmpty) {
-      setState(() {
-        _transcript = partialTranscript;
-      });
-      _endpointTimer?.cancel();
-      _endpointTimer = Timer(const Duration(seconds: 1), () {
-        _stopCheetah();
-      });
-    }
-
-    if (_cheetah!.isEndpoint) {
-      final finalTranscript = await _cheetah!.flush();
-      setState(() {
-        _transcript = finalTranscript;
-      });
-      _endpointTimer?.cancel();
-      await _stopCheetah();
+      if (partialResult.isEndpoint) {
+        final finalResult = await _cheetah!.flush();
+        setState(() {
+          _transcript += finalResult.transcript;
+        });
+        await _stopCheetahAndRestartPorcupine();
+      }
+    } on CheetahException catch (e) {
+      _errorCallback(e);
     }
   }
 
