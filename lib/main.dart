@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:places_service/places_service.dart';
+import 'search_screen.dart';
 
 Future<void> main() async {
   await dotenv.load();
@@ -176,13 +177,15 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _showSearch() async {
-    final result = await _placesService.showAutocomplete(
-      context: context,
-      mode: PlacesAutocompleteMode.overlay,
-      type: PlacesAutocompleteType.geocode,
+    final placeId = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchScreen(placesService: _placesService),
+      ),
     );
-    if (result != null) {
-      final details = await _placesService.getPlaceDetails(result.placeId!);
+
+    if (placeId != null) {
+      final details = await _placesService.getPlaceDetails(placeId);
       if (details != null && details.geometry != null) {
         final location = details.geometry!.location;
         setState(() {
