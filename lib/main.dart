@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:places_service/places_service.dart';
 import 'package:porcupine_flutter/porcupine.dart';
 import 'package:porcupine_flutter/porcupine_error.dart';
-import 'package:porcupine_flutter/porcupine_builtin.dart';
 import 'package:cheetah_flutter/cheetah.dart';
 import 'package:cheetah_flutter/cheetah_error.dart';
 import 'package:flutter_voice_processor/flutter_voice_processor.dart';
