@@ -1,10 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:places_service/places_service.dart';
 
-void main() => runApp(const MyApp());
+Future<void> main() async {
+  await dotenv.load();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -25,6 +30,7 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
+  final _placesService = PlacesService();
   GoogleMapViewController? _mapController;
   bool _isNavigationSessionInitialized = false;
   bool _isNavigating = false;
@@ -35,14 +41,14 @@ class _MapScreenState extends State<MapScreen> {
   PermissionStatus _locationPermissionStatus = PermissionStatus.denied;
   StreamSubscription<RoadSnappedLocationUpdatedEvent>? _locationSubscription;
   LatLng? _currentUserPosition;
-
-  static const _ritzCarltonSFO =
-      LatLng(latitude: 37.788302, longitude: -122.403209);
+  LatLng? _destination;
+  String? _destinationName;
 
   @override
   void initState() {
     super.initState();
     _init();
+    _placesService.initialize(apiKey: dotenv.env['GOOGLE_MAPS_API_KEY']!);
   }
 
   Future<void> _init() async {
@@ -84,12 +90,15 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _addDestinationMarker(GoogleMapViewController controller) {
-    controller.addMarkers([
-      MarkerOptions(
-        position: _ritzCarltonSFO,
-        infoWindow: const InfoWindow(title: 'The Ritz-Carlton'),
-      ),
-    ]);
+    controller.clearMarkers();
+    if (_destination != null) {
+      controller.addMarkers([
+        MarkerOptions(
+          position: _destination!,
+          infoWindow: InfoWindow(title: _destinationName ?? 'Destination'),
+        ),
+      ]);
+    }
   }
 
   Future<void> _startListeningToLocation(GoogleMapViewController controller) async {
@@ -135,16 +144,16 @@ class _MapScreenState extends State<MapScreen> {
 
   void _calculateAndShowRoute() {
     // The button is disabled if _currentUserPosition is null, so this check is redundant but safe.
-    if (_currentUserPosition == null) {
+    if (_currentUserPosition == null || _destination == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('現在地が取得できていません。少し待ってから再度お試しください。')),
+            content: Text('現在地または目的地が設定されていません。')),
       );
       return;
     }
 
     final destination =
-        NavigationWaypoint(title: 'The Ritz-Carlton, San Francisco', target: _ritzCarltonSFO);
+        NavigationWaypoint(title: _destinationName ?? 'Destination', target: _destination!);
 
     GoogleMapsNavigator.setDestinations(Destinations(
       waypoints: [destination],
@@ -164,6 +173,32 @@ class _MapScreenState extends State<MapScreen> {
         );
       }
     });
+  }
+
+  Future<void> _showSearch() async {
+    final result = await _placesService.showAutocomplete(
+      context: context,
+      mode: PlacesAutocompleteMode.overlay,
+      type: PlacesAutocompleteType.geocode,
+    );
+    if (result != null) {
+      final details = await _placesService.getPlaceDetails(result.placeId!);
+      if (details != null && details.geometry != null) {
+        final location = details.geometry!.location;
+        setState(() {
+          _destination = LatLng(latitude: location.lat, longitude: location.lng);
+          _destinationName = details.name;
+          _isRouteLoaded = false;
+        });
+
+        if (_mapController != null) {
+          _mapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(_destination!, 14),
+          );
+          _addDestinationMarker(_mapController!);
+        }
+      }
+    }
   }
 
   Widget _buildBody() {
@@ -213,6 +248,13 @@ class _MapScreenState extends State<MapScreen> {
                 },
               )
             : null,
+        actions: [
+          if (!_isNavigating)
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: _showSearch,
+            ),
+        ],
       ),
       body: _buildBody(),
       floatingActionButton: _isNavigationSessionInitialized && !_isNavigating
@@ -220,8 +262,10 @@ class _MapScreenState extends State<MapScreen> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 FloatingActionButton(
-                  onPressed: _currentUserPosition == null ? null : _calculateAndShowRoute,
-                  backgroundColor: _currentUserPosition == null
+                  onPressed: _currentUserPosition == null || _destination == null
+                      ? null
+                      : _calculateAndShowRoute,
+                  backgroundColor: _currentUserPosition == null || _destination == null
                       ? Colors.grey
                       : Theme.of(context).colorScheme.secondary,
                   child: const Icon(Icons.directions),
