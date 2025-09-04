@@ -53,5 +53,9 @@
 	<string>This app needs access to location when in the background.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>音声認識を利用して目的地を検索します。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>音声で目的地を検索するためにマイクへのアクセスが必要です。</string>
 </dict>
 </plist>

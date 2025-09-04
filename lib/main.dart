@@ -5,6 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_navigation_flutter/google_navigation_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:places_service/places_service.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 import 'search_screen.dart';
 
 Future<void> main() async {
@@ -32,6 +34,12 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final _placesService = PlacesService();
+  final SpeechToText _speechToText = SpeechToText();
+  bool _speechEnabled = false;
+  String _recognizedWords = '';
+  bool _wakeWordDetected = false;
+  String _textAfterWakeWord = '';
+
   GoogleMapViewController? _mapController;
   bool _isNavigationSessionInitialized = false;
   bool _isNavigating = false;
@@ -49,7 +57,45 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _init();
+    _initSpeech();
     _placesService.initialize(apiKey: dotenv.env['GOOGLE_MAPS_API_KEY']!);
+  }
+
+  Future<void> _initSpeech() async {
+    _speechEnabled = await _speechToText.initialize();
+    setState(() {});
+  }
+
+  void _startListening() async {
+    setState(() {
+      _wakeWordDetected = false;
+      _textAfterWakeWord = '';
+      _recognizedWords = '';
+    });
+    await _speechToText.listen(onResult: _onSpeechResult, localeId: "ja_JP");
+    setState(() {});
+  }
+
+  void _stopListening() async {
+    await _speechToText.stop();
+    setState(() {});
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    setState(() {
+      _recognizedWords = result.recognizedWords;
+      const wakeWord = "ヘイジュール";
+      if (!_wakeWordDetected && _recognizedWords.contains(wakeWord)) {
+        _wakeWordDetected = true;
+      }
+      if (_wakeWordDetected) {
+        final wakeWordIndex = _recognizedWords.indexOf(wakeWord);
+        if (wakeWordIndex != -1) {
+          _textAfterWakeWord =
+              _recognizedWords.substring(wakeWordIndex + wakeWord.length).trim();
+        }
+      }
+    });
   }
 
   Future<void> _init() async {
@@ -253,12 +299,32 @@ class _MapScreenState extends State<MapScreen> {
         actions: [
           if (!_isNavigating)
             IconButton(
+              icon: Icon(_speechToText.isNotListening ? Icons.mic_off : Icons.mic),
+              onPressed: _speechToText.isNotListening ? _startListening : _stopListening,
+            ),
+          if (!_isNavigating)
+            IconButton(
               icon: const Icon(Icons.search),
               onPressed: _showSearch,
             ),
         ],
       ),
-      body: _buildBody(),
+      body: Stack(
+        children: <Widget>[
+          _buildBody(),
+          if (_wakeWordDetected)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.all(16.0),
+                color: Colors.black.withOpacity(0.5),
+                child: Text(
+                  _textAfterWakeWord,
+                  style: const TextStyle(color: Colors.white, fontSize: 24.0),
+                ),
+              ),
+            ),
+        ],
+      ),
       floatingActionButton: _isNavigationSessionInitialized && !_isNavigating
           ? Column(
               mainAxisAlignment: MainAxisAlignment.end,
